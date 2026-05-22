@@ -1,38 +1,39 @@
 const rateLimit = require('express-rate-limit');
-const RedisStore = require('rate-limit-redis');
-const redis      = require('../config/redis');
+const { RedisStore } = require('rate-limit-redis');
+const redis = require('../config/redis');
 
-// ✅ Redis store — saare workers ka ek shared counter
-// Bina Redis ke: har worker ka alag counter = rate limit kaam nahi karta
-const store = new RedisStore({
+
+// ✅ API limiter store
+const apiStore = new RedisStore({
   sendCommand: (...args) => redis.call(...args),
-  prefix: 'rl:', // Redis key prefix
+  prefix: 'rl:api:',
 });
 
-// General API limiter
+
+// ✅ Auth limiter store
+const authStore = new RedisStore({
+  sendCommand: (...args) => redis.call(...args),
+  prefix: 'rl:auth:',
+});
+
+
+// ✅ General API limiter
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,                  // 100 requests per window
-  standardHeaders: true,     // RateLimit-* headers return karo
-  legacyHeaders: false,
-  store,
-  
-  // ✅ Custom error message
-  handler: (req, res) => {
-    res.status(429).json({
-      success: false,
-      message: 'Bohot zyada requests bheje — 15 minute baad try karo',
-      retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
-    });
-  },
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  store: apiStore,
 });
 
-// Strict limiter — login/signup ke liye
+
+// ✅ Login/Auth limiter
 const authLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,                   // 10 login attempts only
-  store,
-  message: { success: false, message: 'Account temporarily locked' },
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  store: authStore,
 });
 
-module.exports = { apiLimiter, authLimiter };
+
+module.exports = {
+  apiLimiter,
+  authLimiter
+};

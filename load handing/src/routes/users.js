@@ -6,18 +6,22 @@ const { cache, invalidateCache } = require('../middleware/cache');
 // ✅ GET /users — Pagination + Cache + Projection
 router.get('/', cache(30), async (req, res) => {
   try {
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit = Math.min(50, parseInt(req.query.limit) || 10); // Max 50 — security
-    const offset = (page - 1) * limit;
+    const page = Number(req.query.page) || 1;
+const limit = Number(req.query.limit) || 10;
 
-    const [rows] = await pool.execute(
-      `SELECT id, name, email, created_at 
-       FROM users 
-       WHERE is_active = 1
-       ORDER BY id DESC
-       LIMIT ? OFFSET ?`,
-      [limit, offset]
-    );
+const safePage = Math.max(1, page);
+const safeLimit = Math.min(50, limit);
+
+const offset = (safePage - 1) * safeLimit; // Max 50 — security
+    
+
+   const [rows] = await pool.query(
+  `SELECT id, name, email, created_at
+   FROM users
+   WHERE is_active = 1
+   ORDER BY id DESC
+   LIMIT ${safeLimit} OFFSET ${offset}`
+);
 
     const [[{ total }]] = await pool.execute(
       `SELECT COUNT(*) as total FROM users WHERE is_active = 1`
@@ -98,7 +102,7 @@ router.post('/', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
     
   } finally {
-    conn.release(); // ✅ HAMESHA release karo — finally mein
+    conn.release(); 
   }
 });
 
